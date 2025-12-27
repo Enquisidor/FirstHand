@@ -1,0 +1,13 @@
+runtime: java17
+
+instance_class: F2
+
+env_variables:
+  FIREBASE_PROJECT_ID: "your-project-id"
+  GCP_PROJECT_ID: "your-gcp-project-id"
+  GCP_STORAGE_BUCKET: "your-storage-bucket"
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 0.65
