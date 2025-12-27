@@ -1,330 +1,650 @@
 # FirstHand Domain Model
 
-This document outlines the core domain entities and business rules for the FirstHand platform.
+Compliance-focused domain model aligned with Ontario food safety regulations.
 
-## Design Principles
+**FL** = For Later (waste management features deferred to Step 2)
 
-1. **No Price Setting**: Platform suggests connections but does not set prices or handle payments
-2. **No Auto-Assignment**: All matches are suggestions requiring manual action
-3. **No In-Platform Communication**: Buyers and sellers communicate externally (phone, email)
-4. **Compliance First**: Producers must meet minimum compliance before creating surplus listings
-5. **Ontario-Only**: Geographic constraints limited to Ontario regions
-6. **Subscription-Gated Features**: Feature access controlled by subscription tier
-7. **Producer Privacy**: Producers control which buyers can see their listings
+---
 
-## Authentication & Identity (Keycloak)
+## Data Sources
 
-### User
-- Managed via **Keycloak** for multi-tenancy
-- Email, authentication status
-- Roles (Producer, Buyer, Admin)
-- Can belong to multiple organizations
-- Profile data (name, phone, preferences)
+### DineSafe API (Toronto Open Data)
+**Endpoint**: `ckan0.cf.opendata.inter.prod-toronto.ca/dataset/dinesafe`
 
-**Keycloak Benefits**:
-- Multi-tenancy support
-- SSO capabilities
-- Role-based access control (RBAC)
-- Federation with external identity providers
-- OAuth2/OIDC standards
+**Fields**:
+- `establishment_id`, `establishment_name`, `establishment_type`
+- `establishment_address`, `establishment_status`
+- `inspection_date`, `inspection_id`
+- `infraction_details`, `severity`, `action`
+- `amount_fined`, `court_outcome`
 
-## Organizations
+### SFCR (Safe Food for Canadians Regulations)
+**Authority**: CFIA
+
+**Structure**:
+1. Licensing - Required for import/export and interprovincial trade
+2. Preventive Control Plan (PCP) - Sections 50-85
+3. Traceability - One step back, one step forward
+
+**Documents**:
+- Preventive Control Plan (PCP)
+- Maintenance & Operations Checklist (Sections 50-85)
+- Traceability records (2 year retention)
+
+### Ontario Premises Registry (PPR)
+Assigns Premises Identification Number (PID) to agri-food businesses.
+
+---
+
+## Entities
+
+### User (Keycloak)
+```typescript
+interface User {
+  id: string;
+  email: string;
+  roles: Role[];
+  organizationMemberships: OrganizationMembership[];
+}
+
+interface OrganizationMembership {
+  organizationId: string;
+  role: OrganizationRole;
+  joinedAt: timestamp;
+}
+```
 
 ### Producer
-**Core Fields**:
-- Business details (name, legal name, contact info)
-- Ontario region/geography (postal code, municipality)
-- Business type (farm, co-op, independent retailer, processor)
-- Operating hours/pickup windows
-- Subscription status and tier
-- Compliance status (see Compliance section)
-- Visibility settings (public, restricted, private)
-- Allowed buyer list (if restricted visibility)
+```typescript
+interface Producer {
+  id: string;
+  businessName: string;
+  legalName: string;
+  businessType: BusinessType;
+  address: Address;
+  region: RegionId;
+  municipality: string;
+  postalCode: string;
+  coordinates: GeoPoint;
+  ontarioPremisesId?: string;
+  sfcLicenseNumber?: string;
+  municipalLicenseNumber?: string;
+  contactInfo: ContactInfo;
+  complianceStatus: ComplianceStatus;
+  subscriptionId: string;
+  visibility: VisibilityLevel;
+  allowedBuyerIds?: string[];
+}
 
-**Visibility Rules**:
-- **Public**: All buyers in the region can see listings
-- **Restricted**: Only approved buyers can see listings
-- **Private**: Not discoverable in search, only direct connections
+enum BusinessType {
+  FARM, COOP, PROCESSOR, INDEPENDENT_RETAILER, DISTRIBUTOR
+}
+
+enum ComplianceStatus {
+  NOT_STARTED, IN_PROGRESS, COMPLIANT, EXPIRED, NON_COMPLIANT
+}
+
+enum VisibilityLevel {
+  PUBLIC, RESTRICTED, PRIVATE
+}
+```
 
 ### Buyer
-**Core Fields**:
-- Business details (name, legal name, contact info)
-- Ontario region/geography
-- Buyer type (restaurant, food bank, retailer, processor, institution)
-- Capacity/volume needs
-- Preferred product categories
-- Operating hours/delivery windows
-- Subscription status
+```typescript
+interface Buyer {
+  id: string;
+  businessName: string;
+  legalName: string;
+  buyerType: BuyerType;
+  address: Address;
+  region: RegionId;
+  contactInfo: ContactInfo;
+  subscriptionId: string;
+}
 
-## Regulatory Compliance (Step 1 Core)
+enum BuyerType {
+  RESTAURANT, FOOD_BANK, RETAILER, PROCESSOR, INSTITUTION, CATERING
+}
+```
 
-### ComplianceChecklist
-**Template/Master Data**:
-- Name (e.g., "Ontario Food Safety Requirements")
-- Category (food safety, licensing, transportation, labeling)
-- Applicable business types
-- List of requirement items
-- Renewal cycle (annual, biennial, etc.)
-- Priority level (required, recommended, optional)
+---
 
-**Item-Level Granularity** (within UX limits):
-- Item description
-- Regulatory reference (SFCR, HACCP, etc.)
-- Required documentation
-- Completion criteria
+## Compliance
+
+### ComplianceFramework
+```typescript
+interface ComplianceFramework {
+  id: string;
+  name: string;
+  authority: RegulatoryAuthority;
+  jurisdiction: Jurisdiction;
+  applicableBusinessTypes: BusinessType[];
+  applicableActivities: FoodActivity[];
+  categories: ComplianceCategory[];
+  effectiveDate: date;
+  version: string;
+}
+
+enum RegulatoryAuthority {
+  CFIA, ONTARIO_MECP, ONTARIO_OMAFRA, LOCAL_HEALTH_UNIT, MUNICIPAL
+}
+
+enum FoodActivity {
+  PROCESSING, RETAIL, WHOLESALE, IMPORT, EXPORT, INTERPROVINCIAL_TRADE
+}
+```
+
+### ComplianceCategory
+```typescript
+interface ComplianceCategory {
+  id: string;
+  frameworkId: string;
+  name: string;
+  description: string;
+  sfcrSection?: string;
+  requirements: ComplianceRequirement[];
+  priority: RequirementPriority;
+  displayOrder: number;
+}
+
+enum RequirementPriority {
+  CRITICAL, HIGH, MEDIUM, LOW
+}
+```
+
+### ComplianceRequirement
+```typescript
+interface ComplianceRequirement {
+  id: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  regulatoryReference: string;
+  requiresDocumentation: boolean;
+  documentTypes: DocumentType[];
+  requiresInspection: boolean;
+  requiresRenewal: boolean;
+  renewalPeriod?: Duration;
+  guidanceText?: string;
+  templateId?: string;
+  externalResourceUrl?: string;
+  priority: RequirementPriority;
+}
+
+enum DocumentType {
+  PREVENTIVE_CONTROL_PLAN,
+  MAINTENANCE_OPERATIONS_CHECKLIST,
+  TRACEABILITY_RECORDS,
+  LICENSE_APPLICATION,
+  FOOD_SAFETY_PLAN,
+  HACCP_PLAN,
+  RECALL_PLAN,
+  SANITATION_PLAN,
+  PEST_CONTROL_PLAN,
+  BUSINESS_LICENSE,
+  HEALTH_PERMIT,
+  PREMISES_ID_CERTIFICATE,
+  FOOD_HANDLER_CERTIFICATE,
+  MANAGER_CERTIFICATE
+}
+```
 
 ### ComplianceRecord
-**Per-Producer Tracking**:
-- Producer reference
-- Checklist reference
-- Per-item status:
-  - Not started
-  - In progress
-  - Completed
-  - Expired/needs renewal
-- Attached documents (Cloud Storage references)
-- Completion timestamps
-- Expiry/renewal dates
-- Notes/comments
+```typescript
+interface ComplianceRecord {
+  id: string;
+  producerId: string;
+  requirementId: string;
+  status: ComplianceItemStatus;
+  startedAt?: timestamp;
+  completedAt?: timestamp;
+  expiresAt?: timestamp;
+  documents: ComplianceDocument[];
+  verifiedBy?: VerificationSource;
+  verifiedAt?: timestamp;
+  inspectionId?: string;
+  notes?: string;
+  history: ComplianceStatusChange[];
+  lastUpdated: timestamp;
+  updatedBy: string;
+}
 
-**Data Availability Transparency**:
-- Clearly show which compliance data is available
-- Indicate missing or incomplete items
-- Track data source (producer-entered, verified, auto-imported)
+enum ComplianceItemStatus {
+  NOT_STARTED, IN_PROGRESS, PENDING_VERIFICATION, COMPLETED, EXPIRED, NON_COMPLIANT
+}
+
+enum VerificationSource {
+  SELF_REPORTED, DOCUMENT_UPLOAD, INSPECTION, THIRD_PARTY_AUDIT, AUTOMATED_CHECK
+}
+```
+
+### ComplianceDocument
+```typescript
+interface ComplianceDocument {
+  id: string;
+  complianceRecordId: string;
+  documentType: DocumentType;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storageUrl: string;
+  uploadedAt: timestamp;
+  uploadedBy: string;
+  expiresAt?: timestamp;
+  verified: boolean;
+  verifiedBy?: string;
+  verifiedAt?: timestamp;
+  issueDate?: date;
+  expiryDate?: date;
+  issuingAuthority?: string;
+  certificateNumber?: string;
+}
+```
+
+---
+
+## Inspection Integration
+
+### InspectionRecord
+```typescript
+interface InspectionRecord {
+  id: string;
+  externalInspectionId: string;
+  producerId?: string;
+  establishmentId: string;
+  establishmentName: string;
+  establishmentAddress: string;
+  establishmentType: string;
+  inspectionDate: date;
+  inspectionStatus: InspectionStatus;
+  minimumInspectionsPerYear: number;
+  infractions: Infraction[];
+  dataSource: string;
+  importedAt: timestamp;
+  lastSyncedAt: timestamp;
+}
+
+enum InspectionStatus {
+  PASS, CONDITIONAL_PASS, CLOSED
+}
+
+interface Infraction {
+  infractionDetails: string;
+  severity: InfractionSeverity;
+  action: string;
+  courtOutcome?: string;
+  amountFined?: number;
+}
+
+enum InfractionSeverity {
+  MINOR, SIGNIFICANT, CRITICAL
+}
+```
+
+---
+
+## Document Templates
 
 ### DocumentTemplate
-**Downloadable Templates**:
-- Template type (food safety plan, HACCP, traceability log, shipping manifest)
-- Province-specific (Ontario regulations)
-- Category tags
-- File format (PDF, DOCX, XLSX)
-- Instructions/guidance
-- Regulatory references
+```typescript
+interface DocumentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  documentType: DocumentType;
+  applicableFrameworks: string[];
+  applicableRequirements: string[];
+  templateFileUrl: string;
+  fileFormat: FileFormat;
+  instructions: string;
+  regulatoryReferences: string[];
+  externalResourceUrls: string[];
+  version: string;
+  lastUpdated: timestamp;
+}
 
-## Surplus Management
+enum FileFormat {
+  PDF, DOCX, XLSX, GOOGLE_DOC, FILLABLE_PDF
+}
+```
 
-### SurplusListing
-**Core Fields**:
-- Producer reference
-- Product name, description
-- Product category reference
-- Quantity, unit of measure
-- Available from date/time
-- Available until date/time (expiry consideration)
-- Pickup window
-- Storage requirements (refrigerated, frozen, dry, ambient)
-- Food safety notes
-- Photos (Cloud Storage references)
-- Status (available, reserved, picked up, expired, withdrawn)
-- Visibility (inherits from producer settings)
+---
 
-**CRITICAL**: NO price field - pricing is negotiated externally
-
-**Data Transparency**:
-- Show when listing was created
-- Show when it was last updated
-- Indicate if critical data is missing (e.g., no pickup window)
-
-### ProductCategory
-**Taxonomy**:
-- Name (produce, dairy, baked goods, meat, prepared foods, beverages)
-- Ontario food safety category mapping
-- Storage requirements
-- Typical shelf life guidelines
-- Handling precautions
-- Icon/image
-
-## Connection & Coordination (Step 1 Focus)
-
-### BuyerMatch
-**Suggestion System (NOT auto-assignment)**:
-- Surplus listing reference
-- Suggested buyer references (multiple)
-- Match score/reasoning:
-  - Geographic proximity (distance)
-  - Category fit
-  - Capacity match
-  - Historical pickup success
-- Status per buyer:
-  - Suggested (not yet contacted)
-  - Producer contacted buyer externally
-  - Declined
-  - Accepted/picked up
-- Initiated by (producer or buyer)
-- Created timestamp
-
-**No Communication**: Contact details shown for external communication
-
-### PickupWindow
-**Coordination Data**:
-- Organization reference (producer or buyer)
-- Days of week (bitmask or list)
-- Time ranges (multiple per day)
-- Geographic constraints (will travel X km)
-- Capacity limits (per day, per week)
-- Special instructions
-- Active/inactive status
-
-## Geography (Ontario-specific)
+## Geography
 
 ### Region
-**Ontario Subdivisions**:
-- Name (e.g., "Golden Horseshoe", "Southwestern Ontario", "Eastern Ontario")
-- Postal code ranges (FSA - Forward Sortation Area)
-- Municipalities list
-- Coordinates (bounding box or polygon)
-- Population density category (urban, suburban, rural)
+```typescript
+interface Region {
+  id: string;
+  name: string;
+  type: RegionType;
+  postalCodePrefixes: string[];
+  municipalities: string[];
+  boundingBox?: BoundingBox;
+  populationDensity: DensityCategory;
+}
 
-**Proximity Matching**:
-- Calculate distance between producers and buyers
-- Suggest matches within configurable radius
-- Consider transportation corridors (highways)
+enum RegionType {
+  PROVINCIAL, ECONOMIC, HEALTH_UNIT, MUNICIPAL
+}
 
-## Subscription Management
+enum DensityCategory {
+  URBAN, SUBURBAN, RURAL
+}
+```
+
+---
+
+## Subscription
 
 ### Subscription
-**Per-Organization**:
-- Organization reference (producer or buyer)
-- Tier (free, basic, professional, enterprise)
-- Features enabled:
-  - Max surplus listings
-  - Advanced search/filtering
-  - Analytics dashboard
-  - Priority matching
-  - API access
-  - Custom branding
-- Billing cycle (monthly, annual)
-- Waste reduction metrics (for rebate calculation):
-  - Total quantity listed
-  - Total quantity picked up
-  - Waste reduction percentage
-- Start date
-- End date (null if active)
-- Auto-renew flag
+```typescript
+interface Subscription {
+  id: string;
+  organizationId: string;
+  organizationType: "producer" | "buyer";
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  billingCycle: BillingCycle;
+  currentPeriodStart: timestamp;
+  currentPeriodEnd: timestamp;
+  autoRenew: boolean;
+  features: SubscriptionFeature[];
+  maxComplianceChecklists: number;
+  maxDocumentStorage: number;
+  maxUsers: number;
+}
 
-**Rebate Calculation**:
-- Track quarterly waste reduction
-- Apply rebate when threshold met (e.g., 80% pickup rate)
-- Reduce next billing cycle amount
+enum SubscriptionTier {
+  FREE, BASIC, PROFESSIONAL, ENTERPRISE
+}
 
-## Search & Discovery
+enum SubscriptionFeature {
+  COMPLIANCE_TRACKING,
+  DOCUMENT_TEMPLATES,
+  INSPECTION_INTEGRATION,
+  ANALYTICS_DASHBOARD,
+  PRIORITY_SUPPORT,
+  API_ACCESS,
+  CUSTOM_BRANDING
+}
+```
 
-### ProducerSearch
-**Buyer Capabilities**:
-- Search by region, municipality, postal code
-- Filter by:
-  - Business type
-  - Product categories offered
-  - Compliance status (verified, in progress)
-  - Active surplus listings
-  - Pickup window compatibility
-- Sort by:
-  - Distance
-  - Number of active listings
-  - Most recent activity
+---
 
-**Visibility Enforcement**:
-- Respect producer visibility settings
-- Show only "Public" and approved "Restricted" producers
-- Exclude "Private" producers from search results
+## APIs
 
-### SurplusSearch
-**Buyer Capabilities**:
-- Search by product name, category
-- Filter by:
-  - Available date range
-  - Pickup window compatibility
-  - Distance/region
-  - Storage requirements
-  - Quantity range
-- Sort by:
-  - Distance
-  - Available until (expiring soon)
-  - Quantity
-  - Most recent
+### Producer APIs
+
+#### Create Producer
+```
+POST /api/v1/producers
+Body: { profile: ProducerProfile }
+Response: { id, profile, complianceStatus }
+```
+
+#### Get Producer
+```
+GET /api/v1/producers/:id
+Response: Producer
+```
+
+#### Update Producer
+```
+PUT /api/v1/producers/:id
+Body: { updates: Partial<Producer> }
+Response: Producer
+```
+
+#### Get Compliance Status
+```
+GET /api/v1/producers/:id/compliance
+Response: {
+  overallStatus: ComplianceStatus,
+  frameworks: FrameworkAssignment[],
+  records: ComplianceRecord[],
+  expiringDocuments: ComplianceDocument[]
+}
+```
+
+#### Assign Framework
+```
+POST /api/v1/producers/:id/compliance/assign-framework
+Body: { frameworkId: string }
+Response: { requirements: ComplianceRequirement[] }
+```
+
+#### Update Compliance Record
+```
+PUT /api/v1/producers/:id/compliance/records/:recordId
+Body: {
+  status: ComplianceItemStatus,
+  notes?: string
+}
+Response: ComplianceRecord
+```
+
+#### Upload Document
+```
+POST /api/v1/producers/:id/compliance/documents/upload
+Body: {
+  complianceRecordId: string,
+  fileName: string,
+  fileSize: number,
+  mimeType: string
+}
+Response: {
+  documentId: string,
+  uploadUrl: string (pre-signed Firebase Storage URL)
+}
+```
+
+#### Confirm Document Upload
+```
+POST /api/v1/producers/:id/compliance/documents/:docId/confirm
+Body: { storageUrl: string }
+Response: ComplianceDocument
+```
+
+#### Get Inspections
+```
+GET /api/v1/producers/:id/inspections
+Query: { since?: date, limit?: number }
+Response: InspectionRecord[]
+```
+
+---
+
+### Buyer APIs
+
+#### Create Buyer
+```
+POST /api/v1/buyers
+Body: { profile: BuyerProfile }
+Response: Buyer
+```
+
+#### Get Buyer
+```
+GET /api/v1/buyers/:id
+Response: Buyer
+```
+
+#### Update Buyer
+```
+PUT /api/v1/buyers/:id
+Body: { updates: Partial<Buyer> }
+Response: Buyer
+```
+
+#### Search Producers
+```
+GET /api/v1/search/producers
+Query: {
+  region?: string,
+  municipality?: string,
+  postalCode?: string,
+  businessType?: BusinessType,
+  complianceStatus?: ComplianceStatus,
+  lat?: number,
+  lon?: number,
+  radius?: number (km)
+}
+Response: {
+  producers: Producer[],
+  total: number
+}
+```
+
+**Visibility Rules**:
+- Only PUBLIC and approved RESTRICTED producers returned
+- PRIVATE producers excluded
+- Requires buyer authentication
+
+---
+
+### Compliance APIs
+
+#### List Frameworks
+```
+GET /api/v1/compliance/frameworks
+Response: ComplianceFramework[]
+```
+
+#### Get Framework Details
+```
+GET /api/v1/compliance/frameworks/:id
+Response: {
+  framework: ComplianceFramework,
+  categories: ComplianceCategory[],
+  requirements: ComplianceRequirement[]
+}
+```
+
+#### List Document Templates
+```
+GET /api/v1/compliance/templates
+Query: { documentType?: DocumentType }
+Response: DocumentTemplate[]
+```
+
+#### Download Template
+```
+GET /api/v1/compliance/templates/:id/download
+Response: File download (PDF, DOCX, etc.)
+```
+
+---
+
+### Admin APIs
+
+#### Create Framework
+```
+POST /api/v1/admin/frameworks
+Body: ComplianceFramework
+Response: ComplianceFramework
+```
+
+#### Add Category
+```
+POST /api/v1/admin/frameworks/:id/categories
+Body: ComplianceCategory
+Response: ComplianceCategory
+```
+
+#### Add Requirement
+```
+POST /api/v1/admin/frameworks/:id/requirements
+Body: ComplianceRequirement
+Response: ComplianceRequirement
+```
+
+#### List Unmatched Inspections
+```
+GET /api/v1/admin/inspections/unmatched
+Response: InspectionRecord[]
+```
+
+#### Manual Match Inspection
+```
+POST /api/v1/admin/inspections/:id/match
+Body: { producerId: string }
+Response: InspectionRecord
+```
+
+#### Analytics
+```
+GET /api/v1/admin/analytics
+Response: {
+  complianceRateByRegion: Map<RegionId, number>,
+  averageTimeToCompliance: number,
+  commonComplianceGaps: RequirementId[],
+  documentUploadTrends: TimeSeries,
+  infractionPatterns: Map<InfractionSeverity, number>
+}
+```
+
+---
+
+## Firestore Collections
+
+```
+/users/{userId}
+/producers/{producerId}
+  /complianceRecords/{recordId}
+  /documents/{documentId}
+  /inspections/{inspectionId}
+/buyers/{buyerId}
+/complianceFrameworks/{frameworkId}
+  /categories/{categoryId}
+  /requirements/{requirementId}
+/documentTemplates/{templateId}
+/inspectionRecords/{inspectionId}
+/regions/{regionId}
+/subscriptions/{subscriptionId}
+```
+
+---
+
+## Backend (Akka)
+
+### Core Actors
+- **ProducerActor**: Aggregate root, event sourced
+- **ComplianceActor**: Manages compliance state per producer
+- **DocumentManagerActor**: Handles uploads, quota, expiry
+- **ComplianceFrameworkActor**: Master framework data
+- **InspectionSyncCoordinator**: Daily sync from DineSafe
+- **InspectionImportActor**: Match inspections to producers
+- **SubscriptionActor**: Subscription lifecycle
+
+### Event Sourcing
+- Backend: Firestore via Akka Persistence plugin
+- Snapshots: Every 50-100 events
+- Collections: `/eventJournal/{persistenceId}/events/{sequenceNr}`
+
+### Cluster
+- Sharding: ProducerActors (100 shards)
+- Singletons: InspectionSyncCoordinator, ReminderScheduler
+
+---
 
 ## Business Rules
 
-### Compliance-Gated Features
-1. Producers cannot create surplus listings until:
-   - Basic compliance checklist is 100% complete, OR
-   - Minimum required items are complete (configurable)
-2. Compliance status shown on producer profiles
-3. Expired compliance items trigger warnings
+### Compliance Gating
+- CRITICAL requirements must be 100% complete for PUBLIC visibility
+- NON_COMPLIANT status automatically sets visibility to PRIVATE
+- CRITICAL infractions update ComplianceStatus to NON_COMPLIANT
 
-### Visibility & Privacy
-1. Producer visibility defaults to "Public"
-2. "Restricted" producers maintain buyer allowlist
-3. Buyers request access to "Restricted" producers
-4. Producers approve/deny access requests
-5. "Private" producers are not discoverable
+### Document Expiry
+- Reminder: 30 days before expiry
+- Auto-update status to EXPIRED when expiryDate passes
 
-### Matching Algorithm (Suggestions)
-1. Calculate geographic distance
-2. Check category compatibility
-3. Verify pickup window overlap
-4. Consider historical success rate
-5. Respect visibility restrictions
-6. Return ranked list of suggestions
+### Inspection Matching
+- Auto-match by: exact address, fuzzy name (85% threshold), premises ID
+- CRITICAL infractions → affected ComplianceRecords set to NON_COMPLIANT
 
-### Data Transparency
-1. Show timestamps for all data
-2. Indicate data completeness
-3. Mark verified vs. self-reported data
-4. Show data source (user-entered, imported, verified)
-
-### Subscription Enforcement
-1. Free tier: max 5 surplus listings per month
-2. Basic tier: max 20 listings, basic search
-3. Professional tier: unlimited listings, advanced search, analytics
-4. Enterprise tier: all features + API access
-
-## Event Sourcing Candidates
-
-For audit trails and analytics, consider event sourcing for:
-- SurplusListing state changes
-- ComplianceRecord completions
-- BuyerMatch outcomes (success/failure)
-- Access requests and approvals
-
-## Future Enhancements (Step 2)
-
-When moving to Step 2 (Waste-Reduction Routing):
-- **RouteOptimization**: Multi-stop pickup routes
-- **RouteStop**: Individual stops on optimized routes
-- **TransportationProvider**: Third-party logistics integration
-- **WasteMetrics**: Aggregated analytics per producer, region, category
-
-## Technology Mapping
-
-### Firestore Collections
-```
-/users/{userId}
-/organizations/{orgId}
-  - subcollections: /compliance, /pickupWindows
-/producers/{producerId}
-/buyers/{buyerId}
-/surplusListings/{listingId}
-/complianceChecklists/{checklistId}
-/complianceRecords/{recordId}
-/productCategories/{categoryId}
-/regions/{regionId}
-/subscriptions/{subscriptionId}
-/buyerMatches/{matchId}
-```
-
-### Akka Actors
-- **ProducerActor**: Manages producer state and compliance
-- **BuyerActor**: Manages buyer state and preferences
-- **SurplusActor**: Manages surplus listing lifecycle
-- **MatchingActor**: Calculates buyer matches for surplus
-- **ComplianceActor**: Tracks compliance status and renewals
-
-## Open Questions
-
-1. **Document Storage**: Max document size? Retention policy?
-2. **Photo Uploads**: Image size limits? Compression? CDN?
-3. **Search Performance**: Full-text search via Algolia or Firestore only?
-4. **Analytics**: Real-time vs. batch processing for waste metrics?
-5. **Notifications**: Email? SMS? Push notifications for match suggestions?
-6. **Historical Data**: How long to retain completed/expired listings?
+### Subscription Limits
+- Free: 5 compliance checklists/month, 100 MB storage
+- Basic: 20 checklists, 1 GB storage
+- Professional: Unlimited checklists, 10 GB storage
+- Enterprise: Unlimited + API access

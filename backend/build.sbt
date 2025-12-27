@@ -22,11 +22,19 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-cluster-sharding-typed" % akkaVersion,
 
   // Firebase Admin SDK
-  "com.google.firebase" % "firebase-admin" % "9.2.0",
+  "com.google.firebase" % "firebase-admin" % "9.2.0" excludeAll(
+    ExclusionRule(organization = "com.google.guava")
+  ),
 
-  // Google Cloud
-  "com.google.cloud" % "google-cloud-firestore" % "3.14.5",
-  "com.google.cloud" % "google-cloud-storage" % "2.29.1",
+  // Google Cloud - use compatible versions
+  "com.google.cloud" % "google-cloud-firestore" % "3.7.0" excludeAll(
+    ExclusionRule(organization = "com.google.guava"),
+    ExclusionRule(organization = "io.grpc")
+  ),
+  "com.google.cloud" % "google-cloud-storage" % "2.15.0",
+
+  // Explicitly include compatible Guava version
+  "com.google.guava" % "guava" % "32.1.3-jre",
 
   // JSON
   "io.spray" %% "spray-json" % "1.3.6",
