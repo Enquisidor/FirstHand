@@ -2,6 +2,7 @@ package firsthand
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -15,11 +16,12 @@ object Main extends App with LazyLogging {
 
   private val config = ConfigFactory.load()
 
-  implicit val system: ActorSystem = ActorSystem(
-    Behaviors.empty,
+  implicit val system: ActorSystem[Nothing] = ActorSystem(
+    Behaviors.empty[Nothing],
     "firsthand-system",
     config
   )
+  implicit val classicSystem: akka.actor.ActorSystem = system.toClassic
   implicit val ec: ExecutionContext = system.executionContext
 
   // Initialize Firebase if credentials are available
