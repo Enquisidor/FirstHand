@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // Producers collection
+    match /producers/{producerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      // TODO: Add more granular permissions
+    }
+
+    // Buyers collection
+    match /buyers/{buyerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      // TODO: Add more granular permissions
+    }
+
+    // Surplus inventory
+    match /surplus/{surplusId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      // TODO: Add more granular permissions
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
