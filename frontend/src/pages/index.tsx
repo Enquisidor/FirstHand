@@ -78,7 +78,7 @@ export default function Home() {
           <Stack gap="lg">
             <Title order={3}>About FirstHand</Title>
             <Text>
-              FirstHand helps Ontario's small food producers, co-ops, and independent retailers reduce waste
+              FirstHand helps Ontario&apos;s small food producers, co-ops, and independent retailers reduce waste
               by connecting surplus food with nearby buyers.
             </Text>
 
@@ -88,7 +88,7 @@ export default function Home() {
                 <div>
                   <Text fw={600} mb="xs">Step 1: Build Trust Through Regulatory Friction Reduction</Text>
                   <List spacing="xs" size="sm">
-                    <List.Item>Navigate Ontario's food safety regulations</List.Item>
+                    <List.Item>Navigate Ontario&apos;s food safety regulations</List.Item>
                     <List.Item>Compliance checklists and documentation templates</List.Item>
                     <List.Item>Connect with nearby buyers</List.Item>
                     <List.Item>Coordinate logistics and pickup windows</List.Item>
