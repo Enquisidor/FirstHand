@@ -1,0 +1,1227 @@
+openapi: 3.0.3
+info:
+  title: FirstHand API
+  description: API for compliance management and regulatory friction reduction for Ontario food producers
+  version: 1.0.0
+  contact:
+    name: FirstHand Support
+    url: https://github.com/Enquisidor/FirstHand
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+  - url: https://api.firsthand.ca/api/v1
+    description: Production
+
+tags:
+  - name: Producers
+    description: Producer management and compliance
+  - name: Buyers
+    description: Buyer management and search
+  - name: Compliance
+    description: Compliance frameworks and templates
+  - name: Admin
+    description: Administrative operations
+
+security:
+  - bearerAuth: []
+
+paths:
+  /producers:
+    post:
+      tags: [Producers]
+      summary: Create producer
+      operationId: createProducer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProducerCreateRequest'
+      responses:
+        '201':
+          description: Producer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /producers/{producerId}:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+
+    get:
+      tags: [Producers]
+      summary: Get producer
+      operationId: getProducer
+      responses:
+        '200':
+          description: Producer details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Producers]
+      summary: Update producer
+      operationId: updateProducer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProducerUpdateRequest'
+      responses:
+        '200':
+          description: Producer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /producers/{producerId}/compliance:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+
+    get:
+      tags: [Producers]
+      summary: Get compliance status
+      operationId: getComplianceStatus
+      responses:
+        '200':
+          description: Compliance status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceStatus'
+
+  /producers/{producerId}/compliance/assign-framework:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+
+    post:
+      tags: [Producers]
+      summary: Assign compliance framework
+      operationId: assignFramework
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [frameworkId]
+              properties:
+                frameworkId:
+                  type: string
+      responses:
+        '200':
+          description: Framework assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requirements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplianceRequirement'
+
+  /producers/{producerId}/compliance/records/{recordId}:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+      - $ref: '#/components/parameters/RecordId'
+
+    put:
+      tags: [Producers]
+      summary: Update compliance record
+      operationId: updateComplianceRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/ComplianceItemStatus'
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRecord'
+
+  /producers/{producerId}/compliance/documents/upload:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+
+    post:
+      tags: [Producers]
+      summary: Upload document
+      operationId: uploadDocument
+      description: Request pre-signed URL for document upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [complianceRecordId, fileName, fileSize, mimeType]
+              properties:
+                complianceRecordId:
+                  type: string
+                fileName:
+                  type: string
+                fileSize:
+                  type: integer
+                  format: int64
+                mimeType:
+                  type: string
+      responses:
+        '200':
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                  uploadUrl:
+                    type: string
+                    description: Pre-signed Firebase Storage URL
+
+  /producers/{producerId}/compliance/documents/{documentId}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+      - $ref: '#/components/parameters/DocumentId'
+
+    post:
+      tags: [Producers]
+      summary: Confirm document upload
+      operationId: confirmDocumentUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storageUrl]
+              properties:
+                storageUrl:
+                  type: string
+      responses:
+        '200':
+          description: Document confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceDocument'
+
+  /producers/{producerId}/inspections:
+    parameters:
+      - $ref: '#/components/parameters/ProducerId'
+
+    get:
+      tags: [Producers]
+      summary: Get inspections
+      operationId: getInspections
+      parameters:
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Inspection records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InspectionRecord'
+
+  /buyers:
+    post:
+      tags: [Buyers]
+      summary: Create buyer
+      operationId: createBuyer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyerCreateRequest'
+      responses:
+        '201':
+          description: Buyer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Buyer'
+
+  /buyers/{buyerId}:
+    parameters:
+      - $ref: '#/components/parameters/BuyerId'
+
+    get:
+      tags: [Buyers]
+      summary: Get buyer
+      operationId: getBuyer
+      responses:
+        '200':
+          description: Buyer details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Buyer'
+
+    put:
+      tags: [Buyers]
+      summary: Update buyer
+      operationId: updateBuyer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyerUpdateRequest'
+      responses:
+        '200':
+          description: Buyer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Buyer'
+
+  /search/producers:
+    get:
+      tags: [Buyers]
+      summary: Search producers
+      operationId: searchProducers
+      description: |
+        Search for producers with visibility rules enforced:
+        - Only PUBLIC and approved RESTRICTED producers returned
+        - PRIVATE producers excluded
+        - Requires buyer authentication
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: municipality
+          in: query
+          schema:
+            type: string
+        - name: postalCode
+          in: query
+          schema:
+            type: string
+        - name: businessType
+          in: query
+          schema:
+            $ref: '#/components/schemas/BusinessType'
+        - name: complianceStatus
+          in: query
+          schema:
+            $ref: '#/components/schemas/ComplianceStatusEnum'
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: radius
+          in: query
+          description: Search radius in kilometers
+          schema:
+            type: number
+            format: double
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  producers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Producer'
+                  total:
+                    type: integer
+
+  /compliance/frameworks:
+    get:
+      tags: [Compliance]
+      summary: List compliance frameworks
+      operationId: listFrameworks
+      responses:
+        '200':
+          description: List of frameworks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComplianceFramework'
+
+  /compliance/frameworks/{frameworkId}:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+
+    get:
+      tags: [Compliance]
+      summary: Get framework details
+      operationId: getFramework
+      responses:
+        '200':
+          description: Framework details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  framework:
+                    $ref: '#/components/schemas/ComplianceFramework'
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplianceCategory'
+                  requirements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplianceRequirement'
+
+  /compliance/templates:
+    get:
+      tags: [Compliance]
+      summary: List document templates
+      operationId: listTemplates
+      parameters:
+        - name: documentType
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentType'
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentTemplate'
+
+  /compliance/templates/{templateId}/download:
+    parameters:
+      - $ref: '#/components/parameters/TemplateId'
+
+    get:
+      tags: [Compliance]
+      summary: Download template
+      operationId: downloadTemplate
+      responses:
+        '200':
+          description: File download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+
+  /admin/frameworks:
+    post:
+      tags: [Admin]
+      summary: Create framework
+      operationId: createFramework
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceFramework'
+      responses:
+        '201':
+          description: Framework created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFramework'
+
+  /admin/frameworks/{frameworkId}/categories:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+
+    post:
+      tags: [Admin]
+      summary: Add category
+      operationId: addCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceCategory'
+      responses:
+        '201':
+          description: Category added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCategory'
+
+  /admin/frameworks/{frameworkId}/requirements:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+
+    post:
+      tags: [Admin]
+      summary: Add requirement
+      operationId: addRequirement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceRequirement'
+      responses:
+        '201':
+          description: Requirement added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRequirement'
+
+  /admin/inspections/unmatched:
+    get:
+      tags: [Admin]
+      summary: List unmatched inspections
+      operationId: listUnmatchedInspections
+      responses:
+        '200':
+          description: Unmatched inspection records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InspectionRecord'
+
+  /admin/inspections/{inspectionId}/match:
+    parameters:
+      - $ref: '#/components/parameters/InspectionId'
+
+    post:
+      tags: [Admin]
+      summary: Manual match inspection
+      operationId: matchInspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producerId]
+              properties:
+                producerId:
+                  type: string
+      responses:
+        '200':
+          description: Inspection matched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRecord'
+
+  /admin/analytics:
+    get:
+      tags: [Admin]
+      summary: Get analytics
+      operationId: getAnalytics
+      responses:
+        '200':
+          description: System analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  complianceRateByRegion:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  averageTimeToCompliance:
+                    type: number
+                    description: Days
+                  commonComplianceGaps:
+                    type: array
+                    items:
+                      type: string
+                  infractionPatterns:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProducerId:
+      name: producerId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    BuyerId:
+      name: buyerId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    RecordId:
+      name: recordId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    FrameworkId:
+      name: frameworkId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    TemplateId:
+      name: templateId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    InspectionId:
+      name: inspectionId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Producer:
+      type: object
+      required: [id, businessName, businessType, address, complianceStatus]
+      properties:
+        id:
+          type: string
+        businessName:
+          type: string
+        legalName:
+          type: string
+        businessType:
+          $ref: '#/components/schemas/BusinessType'
+        address:
+          $ref: '#/components/schemas/Address'
+        region:
+          type: string
+        municipality:
+          type: string
+        postalCode:
+          type: string
+        coordinates:
+          $ref: '#/components/schemas/GeoPoint'
+        ontarioPremisesId:
+          type: string
+        sfcLicenseNumber:
+          type: string
+        municipalLicenseNumber:
+          type: string
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+        complianceStatus:
+          $ref: '#/components/schemas/ComplianceStatusEnum'
+        subscriptionId:
+          type: string
+        visibility:
+          $ref: '#/components/schemas/VisibilityLevel'
+        allowedBuyerIds:
+          type: array
+          items:
+            type: string
+
+    ProducerCreateRequest:
+      type: object
+      required: [businessName, businessType, address]
+      properties:
+        businessName:
+          type: string
+        legalName:
+          type: string
+        businessType:
+          $ref: '#/components/schemas/BusinessType'
+        address:
+          $ref: '#/components/schemas/Address'
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+
+    ProducerUpdateRequest:
+      type: object
+      properties:
+        businessName:
+          type: string
+        legalName:
+          type: string
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+        visibility:
+          $ref: '#/components/schemas/VisibilityLevel'
+        allowedBuyerIds:
+          type: array
+          items:
+            type: string
+
+    Buyer:
+      type: object
+      required: [id, businessName, buyerType, address]
+      properties:
+        id:
+          type: string
+        businessName:
+          type: string
+        legalName:
+          type: string
+        buyerType:
+          $ref: '#/components/schemas/BuyerType'
+        address:
+          $ref: '#/components/schemas/Address'
+        region:
+          type: string
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+        subscriptionId:
+          type: string
+
+    BuyerCreateRequest:
+      type: object
+      required: [businessName, buyerType, address]
+      properties:
+        businessName:
+          type: string
+        legalName:
+          type: string
+        buyerType:
+          $ref: '#/components/schemas/BuyerType'
+        address:
+          $ref: '#/components/schemas/Address'
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+
+    BuyerUpdateRequest:
+      type: object
+      properties:
+        businessName:
+          type: string
+        legalName:
+          type: string
+        contactInfo:
+          $ref: '#/components/schemas/ContactInfo'
+
+    ComplianceStatus:
+      type: object
+      properties:
+        overallStatus:
+          $ref: '#/components/schemas/ComplianceStatusEnum'
+        frameworks:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameworkAssignment'
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceRecord'
+        expiringDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceDocument'
+
+    FrameworkAssignment:
+      type: object
+      properties:
+        frameworkId:
+          type: string
+        applicableCategories:
+          type: array
+          items:
+            type: string
+        applicableRequirements:
+          type: array
+          items:
+            type: string
+        assignedAt:
+          type: string
+          format: date-time
+
+    ComplianceFramework:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        authority:
+          $ref: '#/components/schemas/RegulatoryAuthority'
+        jurisdiction:
+          $ref: '#/components/schemas/Jurisdiction'
+        applicableBusinessTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessType'
+        applicableActivities:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodActivity'
+        effectiveDate:
+          type: string
+          format: date
+        version:
+          type: string
+
+    ComplianceCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        frameworkId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        sfcrSection:
+          type: string
+        priority:
+          $ref: '#/components/schemas/RequirementPriority'
+        displayOrder:
+          type: integer
+
+    ComplianceRequirement:
+      type: object
+      properties:
+        id:
+          type: string
+        categoryId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        regulatoryReference:
+          type: string
+        requiresDocumentation:
+          type: boolean
+        documentTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentType'
+        requiresInspection:
+          type: boolean
+        requiresRenewal:
+          type: boolean
+        renewalPeriod:
+          type: string
+        guidanceText:
+          type: string
+        templateId:
+          type: string
+        externalResourceUrl:
+          type: string
+        priority:
+          $ref: '#/components/schemas/RequirementPriority'
+
+    ComplianceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        producerId:
+          type: string
+        requirementId:
+          type: string
+        status:
+          $ref: '#/components/schemas/ComplianceItemStatus'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceDocument'
+        verifiedBy:
+          $ref: '#/components/schemas/VerificationSource'
+        verifiedAt:
+          type: string
+          format: date-time
+        inspectionId:
+          type: string
+        notes:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+
+    ComplianceDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        complianceRecordId:
+          type: string
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        mimeType:
+          type: string
+        storageUrl:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+        uploadedBy:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        verified:
+          type: boolean
+        verifiedBy:
+          type: string
+        verifiedAt:
+          type: string
+          format: date-time
+        issueDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        issuingAuthority:
+          type: string
+        certificateNumber:
+          type: string
+
+    DocumentTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        applicableFrameworks:
+          type: array
+          items:
+            type: string
+        applicableRequirements:
+          type: array
+          items:
+            type: string
+        templateFileUrl:
+          type: string
+        fileFormat:
+          $ref: '#/components/schemas/FileFormat'
+        instructions:
+          type: string
+        regulatoryReferences:
+          type: array
+          items:
+            type: string
+        externalResourceUrls:
+          type: array
+          items:
+            type: string
+        version:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+
+    InspectionRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        externalInspectionId:
+          type: string
+        producerId:
+          type: string
+        establishmentId:
+          type: string
+        establishmentName:
+          type: string
+        establishmentAddress:
+          type: string
+        establishmentType:
+          type: string
+        inspectionDate:
+          type: string
+          format: date
+        inspectionStatus:
+          $ref: '#/components/schemas/InspectionStatus'
+        minimumInspectionsPerYear:
+          type: integer
+        infractions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Infraction'
+        dataSource:
+          type: string
+        importedAt:
+          type: string
+          format: date-time
+        lastSyncedAt:
+          type: string
+          format: date-time
+
+    Infraction:
+      type: object
+      properties:
+        infractionDetails:
+          type: string
+        severity:
+          $ref: '#/components/schemas/InfractionSeverity'
+        action:
+          type: string
+        courtOutcome:
+          type: string
+        amountFined:
+          type: number
+          format: double
+
+    Address:
+      type: object
+      required: [streetNumber, streetName, city, province, postalCode]
+      properties:
+        streetNumber:
+          type: string
+        streetName:
+          type: string
+        unit:
+          type: string
+        city:
+          type: string
+        province:
+          type: string
+          enum: [ON]
+        postalCode:
+          type: string
+        country:
+          type: string
+          enum: [CA]
+
+    ContactInfo:
+      type: object
+      required: [primaryPhone, email]
+      properties:
+        primaryPhone:
+          type: string
+        secondaryPhone:
+          type: string
+        email:
+          type: string
+          format: email
+        website:
+          type: string
+          format: uri
+        preferredContactMethod:
+          $ref: '#/components/schemas/ContactMethod'
+
+    GeoPoint:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+        lon:
+          type: number
+          format: double
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    BusinessType:
+      type: string
+      enum: [FARM, COOP, PROCESSOR, INDEPENDENT_RETAILER, DISTRIBUTOR]
+
+    BuyerType:
+      type: string
+      enum: [RESTAURANT, FOOD_BANK, RETAILER, PROCESSOR, INSTITUTION, CATERING]
+
+    ComplianceStatusEnum:
+      type: string
+      enum: [NOT_STARTED, IN_PROGRESS, COMPLIANT, EXPIRED, NON_COMPLIANT]
+
+    ComplianceItemStatus:
+      type: string
+      enum: [NOT_STARTED, IN_PROGRESS, PENDING_VERIFICATION, COMPLETED, EXPIRED, NON_COMPLIANT]
+
+    VisibilityLevel:
+      type: string
+      enum: [PUBLIC, RESTRICTED, PRIVATE]
+
+    RegulatoryAuthority:
+      type: string
+      enum: [CFIA, ONTARIO_MECP, ONTARIO_OMAFRA, LOCAL_HEALTH_UNIT, MUNICIPAL]
+
+    Jurisdiction:
+      type: string
+      enum: [FEDERAL, PROVINCIAL, MUNICIPAL]
+
+    FoodActivity:
+      type: string
+      enum: [PROCESSING, RETAIL, WHOLESALE, IMPORT, EXPORT, INTERPROVINCIAL_TRADE]
+
+    RequirementPriority:
+      type: string
+      enum: [CRITICAL, HIGH, MEDIUM, LOW]
+
+    DocumentType:
+      type: string
+      enum:
+        - PREVENTIVE_CONTROL_PLAN
+        - MAINTENANCE_OPERATIONS_CHECKLIST
+        - TRACEABILITY_RECORDS
+        - LICENSE_APPLICATION
+        - FOOD_SAFETY_PLAN
+        - HACCP_PLAN
+        - RECALL_PLAN
+        - SANITATION_PLAN
+        - PEST_CONTROL_PLAN
+        - BUSINESS_LICENSE
+        - HEALTH_PERMIT
+        - PREMISES_ID_CERTIFICATE
+        - FOOD_HANDLER_CERTIFICATE
+        - MANAGER_CERTIFICATE
+
+    VerificationSource:
+      type: string
+      enum: [SELF_REPORTED, DOCUMENT_UPLOAD, INSPECTION, THIRD_PARTY_AUDIT, AUTOMATED_CHECK]
+
+    InspectionStatus:
+      type: string
+      enum: [PASS, CONDITIONAL_PASS, CLOSED]
+
+    InfractionSeverity:
+      type: string
+      enum: [MINOR, SIGNIFICANT, CRITICAL]
+
+    FileFormat:
+      type: string
+      enum: [PDF, DOCX, XLSX, GOOGLE_DOC, FILLABLE_PDF]
+
+    ContactMethod:
+      type: string
+      enum: [PHONE, EMAIL, BOTH]
