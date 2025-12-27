@@ -16,8 +16,8 @@ object Main extends App with LazyLogging {
 
   private val config = ConfigFactory.load()
 
-  implicit val system: ActorSystem[Nothing] = ActorSystem(
-    Behaviors.empty[Nothing],
+  val system: ActorSystem[Nothing] = ActorSystem[Nothing](
+    Behaviors.empty,
     "firsthand-system",
     config
   )
