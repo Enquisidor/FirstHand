@@ -4,9 +4,10 @@ Next.js/TypeScript frontend for the FirstHand food waste platform.
 
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
+- **Framework:** Next.js 14 (Pages Router)
 - **Language:** TypeScript 5.3
-- **UI Library:** React 18
+- **UI Library:** React 18 + Mantine 7
+- **Icons:** Tabler Icons
 - **State Management:** Redux Toolkit
 - **Utilities:** Lodash
 - **Auth & Database:** Firebase
@@ -27,7 +28,8 @@ frontend/
 │   │   └── slices/         # Redux slices
 │   ├── lib/                # Utilities
 │   │   ├── firebase.ts     # Firebase initialization
-│   │   └── api.ts          # API client
+│   │   ├── api.ts          # API client
+│   │   └── theme.ts        # Mantine theme configuration
 │   ├── types/              # TypeScript types
 │   └── styles/             # CSS styles
 │       └── globals.css
@@ -89,6 +91,58 @@ npm run lint
 # Type check
 npm run type-check
 ```
+
+## Mantine UI
+
+FirstHand uses Mantine v7 for UI components with a custom green/sustainability theme.
+
+### Theme Configuration
+
+The theme is configured in `src/lib/theme.ts`:
+
+```typescript
+import { MantineThemeOverride } from '@mantine/core';
+
+export const theme: MantineThemeOverride = {
+  primaryColor: 'green',
+  colors: {
+    green: [/* custom green palette */],
+  },
+};
+```
+
+### Using Mantine Components
+
+```typescript
+import { Button, Text, Paper, Container } from '@mantine/core';
+import { IconLeaf } from '@tabler/icons-react';
+
+function MyComponent() {
+  return (
+    <Container>
+      <Paper shadow="sm" p="md">
+        <Button leftSection={<IconLeaf size={16} />}>
+          Reduce Waste
+        </Button>
+      </Paper>
+    </Container>
+  );
+}
+```
+
+### Available Packages
+
+- **@mantine/core**: Core components (Button, Text, Paper, etc.)
+- **@mantine/hooks**: Useful React hooks
+- **@mantine/form**: Form management
+- **@mantine/notifications**: Toast notifications
+- **@tabler/icons-react**: Icon library
+
+### Resources
+
+- [Mantine Documentation](https://mantine.dev/)
+- [Mantine Components](https://mantine.dev/core/button/)
+- [Tabler Icons](https://tabler-icons.io/)
 
 ## Redux Store
 

@@ -34,6 +34,7 @@ FirstHand uses a two-step strategy to build trust and reduce waste:
 ### Frontend
 - **Framework:** Next.js 14 (React 18)
 - **Language:** TypeScript
+- **UI Library:** Mantine 7
 - **State Management:** Redux Toolkit
 - **Utilities:** Lodash
 - **Auth & Database:** Firebase
